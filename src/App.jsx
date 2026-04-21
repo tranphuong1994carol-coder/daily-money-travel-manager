@@ -47,6 +47,15 @@ function monthKey(dateString) {
   return (dateString || TODAY()).slice(0, 7);
 }
 
+function formatRateTimestamp(value) {
+  if (!value) {
+    return TODAY();
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? TODAY() : parsed.toISOString().slice(0, 10);
+}
+
 function safeParseStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -326,11 +335,17 @@ function App() {
     setRateMessage(`Fetching ${from}/${to}...`);
 
     try {
-      const response = await fetch(`https://api.frankfurter.app/latest?from=${from}&to=${to}`);
+      const response = await fetch(`https://open.er-api.com/v6/latest/${from}`);
       const data = await response.json();
+      const nextRate = Number(data?.rates?.[to]);
+
+      if (!response.ok || data?.result !== "success" || !Number.isFinite(nextRate) || nextRate <= 0) {
+        throw new Error(`Unsupported exchange pair ${from}/${to}`);
+      }
+
       const nextValue = {
-        rate: Number(data?.rates?.[to] || 1),
-        date: data?.date || TODAY(),
+        rate: nextRate,
+        date: formatRateTimestamp(data?.time_last_update_utc),
       };
 
       setRatesCache((current) => ({ ...current, [key]: nextValue }));
